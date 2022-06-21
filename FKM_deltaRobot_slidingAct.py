@@ -100,22 +100,12 @@ def createScene(rootNode):
     forceActuator=20e3
     SetDepAct = 0.250
     depAct    = 10
-    # arm1 = elasticobject.addChild('Arm1')
-    # arm1.addObject('MechanicalObject', template='Rigid3', position=rigidifiedstruct.RigidParts.dofs.position[0])
-    # arm1.addObject('SlidingActuator',name='Act1',template='Rigid3d', indices='0', direction='1 0 0 0 0 0', maxForce=forceActuator, minForce=-forceActuator, maxDispVariation=SetDepAct, maxPositiveDisp=depAct,maxNegativeDisp=depAct)
-    # # arm1.addObject('RigidRigidMapping', index=0,globalToLocalCoords=True)
-    # arm1.addObject('BarycentricMapping', mapForces="false", mapMasses="false")
     frame= rigidifiedstruct.RigidParts
-    # frame.addObject('SlidingActuator', name='Act1', template='Rigid3', 
-    # 	                indices=0, direction=[1, 0, 0, 0, 0, 0], 
-    #                     maxForce=forceActuator, minForce=-forceActuator, 
-    #                     maxDispVariation=SetDepAct, maxPositiveDisp=depAct, maxNegativeDisp=depAct)
     for i in range(3):
         frame.addObject('SlidingActuator', name='Act'+str(i+1), template='Rigid3', 
                     indices=i, direction=[1, 0, 0, 0, 0, 0], 
                     maxForce=forceActuator, minForce=-forceActuator, 
                     maxDispVariation=SetDepAct, maxPositiveDisp=depAct, maxNegativeDisp=depAct)
-    # unfortunatly the component SlidingActuator needs the following component to fix the frames in the other directions
     # frame.addObject('PartialFixedConstraint', template='Rigid3', indices=0, fixedDirections=[0, 1, 1, 1, 1, 1])
     frame.addObject('PartialFixedConstraint', template='Rigid3', indices=[0,1,2], fixedDirections=[1, 1, 1, 1, 1, 1])
     frame.addObject('FixedConstraint', template='Rigid3', indices=[0,1,2])
@@ -132,17 +122,18 @@ def createScene(rootNode):
     # rigidifiedstruct.RigidParts.RigidifiedParticules.addObject("ConstantForceField",name="cff",force='0.0 0.0 0.0', showArrowSize=0.03) # force used to compute the stiffness
     # rigidifiedstruct.RigidParts.RigidifiedParticules.addObject("DiagonalVelocityDampingForceField",name="dvdff",dampingCoefficient='0.1 0.1 0.1') # additional damping to compute the stiffness.
 ### Add a free center for goal gestion.
+    print(frame.dofs.position.getLinkPath())
     freeCenter = rigidifiedstruct.addChild('FreeCenter')
-    freeCenter.addObject('MechanicalObject', name="dofs", template="Rigid3", position=frame.dofs.position[3], showObject=True, showObjectScale=0.5)
+    freeCenter.addObject('MechanicalObject', name="dofs", template="Rigid3", position=frame.dofs.position.getLinkPath(), showObject=True, showObjectScale=0.5)
     freeCenter.addChild(rigidifiedstruct.RigidParts)
-    # rigidifiedstruct.RigidParts.addObject('RigidRigidMapping', index=3,globalToLocalCoords=True)
-    freeCenter.addChild('RigidMapping')
+    # rigidifiedstruct.RigidParts.addObject('RigidRigidMapping', index=3, globalToLocalCoords=True)
+    # freeCenter.addChild('RigidMapping')
     simulationNode.addChild(freeCenter)
 
 ### Controller of the DeltaRobot    
     modelling.addObject(DeltaController(node=rootNode)) #
 
-### Additional lines to solve modeling problem that doesn't work because of the difference of the structure of my programming
+### Additional lines to solve modeling problem
     modelling.addObject('MechanicalMatrixMapper',
                                  name        = "deformableAndFreeCenterCoupling",
                                  template    = 'Vec3,Rigid3',
