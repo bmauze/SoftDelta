@@ -40,12 +40,16 @@ def createScene(rootNode):
     ' Sofa.Component.IO.Mesh Sofa.Component.Mass Sofa.Component.SceneUtility Sofa.Component.SolidMechanics.FEM.Elastic Sofa.Component Sofa.Component.StateContainer Sofa.Component.Topology.Container.Dynamic Sofa.Component.Visual SofaGeneralEngine Sofa.GL.Component.Rendering3D '+
     'Sofa.Component.LinearSolver.Iterative Sofa.Component.Mapping.MappedMatrix Sofa.Component.ODESolver.Backward' )
     rootNode.addObject('DefaultVisualManagerLoop')
-    # rootNode.addObject('FreeMotionAnimationLoop')
-    rootNode.addObject('FreeMotionMasterSolver')
+    rootNode.addObject('FreeMotionAnimationLoop')
+    # rootNode.addObject('FreeMotionMasterSolver')
     rootNode.addObject('QPInverseProblemSolver', name="QP", printLog='0')
+    # rootNode.addObject('GenericConstraintSolver', maxIterations=250, tolerance=1e-12)
+    # rootNode.addObject("CGLinearSolver", iterations=250, tolerance=1e-12, threshold=1e-20)
+    # rootNode.addObject('SparseLDLSolver', name='ldl')
+    # rootNode.addObject('GenericConstraintCorrection',name='GCC')
     AnimationManager(rootNode)
     
-    # rootNode.addObject('GenericConstraintSolver', maxIterations=50, tolerance=1e-5)
+    
 ###################################################################################################################################
 ### Mechanical structure ####
     modelling = rootNode.addChild("Modelling")
@@ -60,20 +64,20 @@ def createScene(rootNode):
     commandBox = addOrientedBoxRoi(selection, position=[list(i) for i in elasticobject.dofs.rest_position.value],
                             name="BoxROI1", translation=[9.386,0.0,8.61], eulerRotation=[00.0,-45.0,0.0], scale=[2, 6, 2])
     commandBox.init()
-    groupeInd.append([ind for ind in commandBox.indices.value]) # indices inditified from the box 1
+    groupeInd.append([ind for ind in commandBox.indices.value]) # indices identified from the box 1
     commandBox2 = addOrientedBoxRoi(selection, position=[list(i) for i in elasticobject.dofs.rest_position.value],
                             name="BoxROI2", translation=[-4.7,7.7,8.61], eulerRotation=[0.0,-45.0,120.0], scale=[2, 6, 2])
     commandBox2.init()
-    groupeInd.append([ind for ind in commandBox2.indices.value])# indices inditified from the box 2
+    groupeInd.append([ind for ind in commandBox2.indices.value])# indices identified from the box 2
     commandBox3 = addOrientedBoxRoi(selection, position=[list(i) for i in elasticobject.dofs.rest_position.value],
                             name="BoxROI3", translation=[-4.7,-7.7,8.61], eulerRotation=[0.0, -45.0, 240.0], scale=[2, 6, 2])
     commandBox3.init()
-    groupeInd.append([ind for ind in commandBox3.indices.value])# indices inditified from the box 3
+    groupeInd.append([ind for ind in commandBox3.indices.value])# indices identified from the box 3
 
 ### Constraints added to restrain the robot's movement (simulation of the 2 of 3 actuators fixed )
     elasticobject.addObject('FixedConstraint', name="FC2", indices=commandBox2.indices.value)
     elasticobject.addObject('FixedConstraint', name="FC3", indices=commandBox3.indices.value)
-    elasticobject.addObject('PartialFixedConstraint', indices=commandBox.indices.value, fixedDirections='0 1 1 1 1 1')
+    elasticobject.addObject('PartialFixedConstraint', indices=commandBox.indices.value, fixedDirections='1 1 1 1 1 1')
 
 ### Rigidification of the center of the robot using a sphereDOI to link the border points to one unique frame.
     o = elasticobject.addObject('SphereROI', name='SphereRoi', template='Rigid3',centers=[0.0,0.0,0.5], radii=[1.2], drawSphere=True)
@@ -96,26 +100,45 @@ def createScene(rootNode):
     forceActuator=20e3
     SetDepAct = 0.250
     depAct    = 10
-    arm1 = elasticobject.addChild('Arm1')
-    arm1.addObject('MechanicalObject', template='Rigid3', position=rigidifiedstruct.RigidParts.dofs.position[0])
-    arm1.addObject('SlidingActuator',name='Act1',template='Rigid3d', indices='0', direction='1 0 0 0 0 0', maxForce=forceActuator, minForce=-forceActuator, maxDispVariation=SetDepAct, maxPositiveDisp=depAct,maxNegativeDisp=depAct)
-    # arm1.addObject('RigidRigidMapping', index=0,globalToLocalCoords=True)
-    arm1.addObject('BarycentricMapping', mapForces="false", mapMasses="false")
-    # 
+    # arm1 = elasticobject.addChild('Arm1')
+    # arm1.addObject('MechanicalObject', template='Rigid3', position=rigidifiedstruct.RigidParts.dofs.position[0])
+    # arm1.addObject('SlidingActuator',name='Act1',template='Rigid3d', indices='0', direction='1 0 0 0 0 0', maxForce=forceActuator, minForce=-forceActuator, maxDispVariation=SetDepAct, maxPositiveDisp=depAct,maxNegativeDisp=depAct)
+    # # arm1.addObject('RigidRigidMapping', index=0,globalToLocalCoords=True)
+    # arm1.addObject('BarycentricMapping', mapForces="false", mapMasses="false")
+    frame= rigidifiedstruct.RigidParts
+    # frame.addObject('SlidingActuator', name='Act1', template='Rigid3', 
+    # 	                indices=0, direction=[1, 0, 0, 0, 0, 0], 
+    #                     maxForce=forceActuator, minForce=-forceActuator, 
+    #                     maxDispVariation=SetDepAct, maxPositiveDisp=depAct, maxNegativeDisp=depAct)
+    for i in range(3):
+        frame.addObject('SlidingActuator', name='Act'+str(i+1), template='Rigid3', 
+                    indices=i, direction=[1, 0, 0, 0, 0, 0], 
+                    maxForce=forceActuator, minForce=-forceActuator, 
+                    maxDispVariation=SetDepAct, maxPositiveDisp=depAct, maxNegativeDisp=depAct)
+    # unfortunatly the component SlidingActuator needs the following component to fix the frames in the other directions
+    # frame.addObject('PartialFixedConstraint', template='Rigid3', indices=0, fixedDirections=[0, 1, 1, 1, 1, 1])
+    frame.addObject('PartialFixedConstraint', template='Rigid3', indices=[0,1,2], fixedDirections=[1, 1, 1, 1, 1, 1])
+    frame.addObject('FixedConstraint', template='Rigid3', indices=[0,1,2])
+###  Similation Node within the calculation is performed  ####
     simulationNode = rootNode.addChild("Simulation")
     simulationNode.addObject("EulerImplicitSolver",name="TimeIntegrationSchema")
-    simulationNode.addObject("CGLinearSolver", iterations=50, tolerance=1e-5, threshold=1e-05)
+    simulationNode.addObject("CGLinearSolver", iterations=250, tolerance=1e-12, threshold=1e-12)
+    # simulationNode.addObject('SparseLDLSolver', name='LinearSolver', template='CompressedRowSparseMatrixd')
+    # simulationNode.addObject('GenericConstraintCorrection')
     simulationNode.addChild(rigidifiedstruct)
-    simulationNode.addChild(arm1)
+    # simulationNode.addChild(frame.Act1)
 
 ### Additional forces, momentum and environmental effet
     # rigidifiedstruct.RigidParts.RigidifiedParticules.addObject("ConstantForceField",name="cff",force='0.0 0.0 0.0', showArrowSize=0.03) # force used to compute the stiffness
     # rigidifiedstruct.RigidParts.RigidifiedParticules.addObject("DiagonalVelocityDampingForceField",name="dvdff",dampingCoefficient='0.1 0.1 0.1') # additional damping to compute the stiffness.
 ### Add a free center for goal gestion.
     freeCenter = rigidifiedstruct.addChild('FreeCenter')
-    freeCenter.addObject('MechanicalObject', name="dofs", template="Rigid3", position=[0., 0., 0., 0., 0., 0., 1.], showObject=False, showObjectScale=0.5)
+    freeCenter.addObject('MechanicalObject', name="dofs", template="Rigid3", position=frame.dofs.position[3], showObject=True, showObjectScale=0.5)
     freeCenter.addChild(rigidifiedstruct.RigidParts)
-                        
+    # rigidifiedstruct.RigidParts.addObject('RigidRigidMapping', index=3,globalToLocalCoords=True)
+    freeCenter.addChild('RigidMapping')
+    simulationNode.addChild(freeCenter)
+
 ### Controller of the DeltaRobot    
     modelling.addObject(DeltaController(node=rootNode)) #
 
@@ -126,6 +149,9 @@ def createScene(rootNode):
                                  object1     = rigidifiedstruct.DeformableParts.dofs.getLinkPath(),
                                  object2     = rigidifiedstruct.FreeCenter.dofs.getLinkPath(),
                                  nodeToParse = rigidifiedstruct.DeformableParts.ElasticMaterialObject.getLinkPath())
+
+    frame.addObject('Monitor',name = 'PlatP', template = 'Rigid3',listening = '1',indices = "3", showTrajectories = "1",TrajectoriesPrecision = "0.01", TrajectoriesColor = "0 0 1 1", sizeFactor="1",ExportPositions="true",ExportVelocities="false",ExportForces="false")
+
     return rootNode
 
 class DeltaController(Sofa.Core.Controller):
@@ -135,26 +161,33 @@ class DeltaController(Sofa.Core.Controller):
         Sofa.Core.Controller.__init__(self, *a, **kw)
         self.node = kw["node"]
         self.stepsize = 0.1
+        self.pose = self.node.Modelling.RigidifiedStructure.RigidParts.dofs.position
 
     def onKeypressedEvent(self, event):
         key = event['key']
 
         if key == Key.uparrow:
-            # self.node.Modelling.Arm1.Act1.displacement = self.node.Modelling.Arm1.Act1.displacement.value + self.stepsize
-            self.node.Modelling.ElasticMaterialObject.Arm1.Act1.displacement = self.node.Modelling.ElasticMaterialObject.Arm1.Act1.displacement.value + self.stepsize
+            print("Displacement in the X+ direction")
+            self.node.Modelling.RigidifiedStructure.RigidParts.Act1.displacement.value = self.node.Modelling.RigidifiedStructure.RigidParts.Act1.displacement.value + self.stepsize
+            self.pose[0][0]=self.pose[0][0] + self.stepsize
+            self.node.Modelling.RigidifiedStructure.RigidParts.dofs.position = self.pose
+            print(self.node.Modelling.RigidifiedStructure.RigidParts.Act1.displacement.value)
         elif key == Key.downarrow:
-            # self.node.Modelling.Arm1.Act1.displacement = self.node.Modelling.Arm1.Act1.displacement.value - self.stepsize
-            self.node.Modelling.ElasticMaterialObject.Arm1.Act1.displacement = self.node.Modelling.ElasticMaterialObject.Arm1.Act1.displacement.value - self.stepsize
-            
-
-        # if key == Key.leftarrow:
-        #     self.actuators[1].ServoMotor.angleIn = self.actuators[1].ServoMotor.angleOut.value + self.stepsize
-        # elif key == Key.rightarrow:
-        #     self.actuators[1].ServoMotor.angleIn = self.actuators[1].ServoMotor.angleOut.value - self.stepsize
-
-        # if key == Key.plus:
-        #     self.actuators[2].ServoMotor.angleIn = self.actuators[2].ServoMotor.angleOut.value + self.stepsize
-        # elif key == Key.minus:
-        #     self.actuators[2].ServoMotor.angleIn = self.actuators[2].ServoMotor.angleOut.value - self.stepsize
-
+            print("Displacement in the X- direction")
+            self.node.Modelling.RigidifiedStructure.RigidParts.Act1.displacement.value = self.node.Modelling.RigidifiedStructure.RigidParts.Act1.displacement.value - self.stepsize
+            self.pose[0][0]=self.pose[0][0] - self.stepsize
+            self.node.Modelling.RigidifiedStructure.RigidParts.dofs.position = self.pose
+            print(self.node.Modelling.RigidifiedStructure.RigidParts.Act1.displacement.value)
+        if key == Key.plus:
+            print("Displacement in the Z+ direction")
+            self.node.Modelling.RigidifiedStructure.RigidParts.Act1.displacement.value = self.node.Modelling.RigidifiedStructure.RigidParts.Act1.displacement.value + self.stepsize
+            self.pose[0][2] = self.pose[0][2] + self.stepsize
+            self.node.Modelling.RigidifiedStructure.RigidParts.dofs.position = self.pose
+            print(self.node.Modelling.RigidifiedStructure.RigidParts.Act1.displacement.value)
+        elif key == Key.minus:
+            print("Displacement in the Z- direction")
+            self.node.Modelling.RigidifiedStructure.RigidParts.Act1.displacement.value = self.node.Modelling.RigidifiedStructure.RigidParts.Act1.displacement.value - self.stepsize
+            self.pose[0][2] = self.pose[0][2] - self.stepsize
+            self.node.Modelling.RigidifiedStructure.RigidParts.dofs.position = self.pose
+            print(self.node.Modelling.RigidifiedStructure.RigidParts.Act1.displacement.value)
         return 0
